@@ -54,7 +54,8 @@ namespace SceneSculpt
         {
             Title = "SceneSculpt";
             Size = new Size(-1, -1);
-            MinimumSize = new Size(800, 512);
+            AutoSize = true;
+						Resizable = false;
 
             goButton.Click += OnGoClicked;
             applyAsBackgroundButton.Click += OnApplyAsBackgroundClicked;
@@ -151,6 +152,8 @@ namespace SceneSculpt
                 ScaleWidth = false,
                 Control = new StackLayout
                 {
+                    Visible = false,
+                    MinimumSize = new Size(200, -1),
                     Padding = 20,
                     Spacing = 10,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -171,7 +174,7 @@ namespace SceneSculpt
                         promptWeightSliderLabel,
                         promptWeightSlider,
                     }
-                }
+                },
             };
 
             imageView.Visible = false;
@@ -199,6 +202,7 @@ namespace SceneSculpt
                                 ScaleWidth = false,
                                 Control = new StackLayout
                                 {
+                                    MinimumSize = new Size(200, -1),
                                     Padding = 20,
                                     Spacing = 10,
                                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -220,6 +224,21 @@ namespace SceneSculpt
                     }
                 }
             };
+        }
+
+        ~SceneSculptForm()
+        {
+            goButton.Click -= OnGoClicked;
+            applyAsBackgroundButton.Click -= OnApplyAsBackgroundClicked;
+            importImageButton.Click -= OnImportImageClicked;
+            exportImageButton.Click -= OnExportImageClicked;
+            captureFromViewportButton.Click -= OnCaptureFromViewportClicked;
+            toggleConfigButton.Click -= OnToggleConfigClicked;
+            stepsSlider.ValueChanged -= OnStepsSliderValueChanged;
+            cfgScaleSlider.ValueChanged -= OnCfgScaleSliderValueChanged;
+            promptWeightSlider.ValueChanged -= OnPromptWeightSliderValueChanged;
+            imageStrengthSlider.ValueChanged -= OnImageStrengthSliderValueChanged;
+            currentImage?.Dispose();
         }
 
         private void OnExportImageClicked(object sender, EventArgs e)
@@ -244,21 +263,6 @@ namespace SceneSculpt
         {
             promptWeightSliderLabel.Text =
                 $"Prompt Weight: {(double)promptWeightSlider.Value / 100}";
-        }
-
-        ~SceneSculptForm()
-        {
-            goButton.Click -= OnGoClicked;
-            applyAsBackgroundButton.Click -= OnApplyAsBackgroundClicked;
-            importImageButton.Click -= OnImportImageClicked;
-            exportImageButton.Click -= OnExportImageClicked;
-            captureFromViewportButton.Click -= OnCaptureFromViewportClicked;
-            toggleConfigButton.Click -= OnToggleConfigClicked;
-            stepsSlider.ValueChanged -= OnStepsSliderValueChanged;
-            cfgScaleSlider.ValueChanged -= OnCfgScaleSliderValueChanged;
-            promptWeightSlider.ValueChanged -= OnPromptWeightSliderValueChanged;
-            imageStrengthSlider.ValueChanged -= OnImageStrengthSliderValueChanged;
-            currentImage?.Dispose();
         }
 
         private void OnStepsSliderValueChanged(object sender, EventArgs e)
@@ -309,8 +313,7 @@ namespace SceneSculpt
                 return;
 
             // TODO: Save in project path?
-            var path = Path.Combine(Path.GetTempPath(), "background.png");
-
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "background.png");
             currentImage.Save(path, ImageFormat.Png);
             selectedView.MainViewport.SetWallpaper(path, false);
         }
