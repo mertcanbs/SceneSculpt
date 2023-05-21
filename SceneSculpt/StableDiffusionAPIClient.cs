@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -13,7 +13,7 @@ namespace SceneSculpt
 	{
 		private static readonly string engineId = "stable-diffusion-xl-beta-v2-2-2";
 		private static readonly RestClient client = new RestClient($"https://api.stability.ai/v1");
-		private static readonly string apiKey = ""; 
+		private static readonly string apiKey = "sk-0F4jX4w6EdApKD4JrB6nXxT2cQlpU07GCgZlzOFG2iUVQQm9"; 
 
 		// Config
 		private static int height = 512;
@@ -24,8 +24,20 @@ namespace SceneSculpt
 
 		public static async Task<string> TextToImage(string text)
 		{
-			var body = JsonSerializer.Serialize(new TextToImageRequest(text));
-			var request = new RestRequest($"/generation/{engineId}/text-to-image", Method.Post).AddBody(body, ContentType.Json);
+			var body = new Dictionary<string, object> {
+				{ "height", height },
+				{ "width", width },
+				{ "cfg_scale", cfgScale },
+				{ "style_preset", stylePreset },
+				{ "text_prompts", new List<object> {
+					new Dictionary<string, object> {
+						{ "text", text },
+						{ "weight", promptWeight },
+					},
+				} },
+			};
+			var request = new RestRequest($"/generation/{engineId}/text-to-image", Method.Post);
+			request.AddBody(body, ContentType.Json);
 			request.AddHeader("Authorization", $"Bearer {apiKey}");
 			request.AddHeader("Content-Type", "application/json");
 			request.AddHeader("Accept", "application/json");
@@ -35,11 +47,7 @@ namespace SceneSculpt
 			{
 				try
 				{
-					RhinoApp.WriteLine("received image");
-					File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "response.json"), response.Content);
-					RhinoApp.WriteLine("file written");
 					var serializedResponse = JsonSerializer.Deserialize<ImageResponse>(response.Content);
-					RhinoApp.WriteLine("deserialized");
 					return serializedResponse.Artifacts[0].Base64;
 				}
 				catch (Exception e)
@@ -77,10 +85,7 @@ namespace SceneSculpt
 			{
 				try
 				{
-					RhinoApp.WriteLine("received image");
-					File.WriteAllText(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "response.json"), response.Content);
 					var serializedResponse = JsonSerializer.Deserialize<ImageResponse>(response.Content);
-					RhinoApp.WriteLine(serializedResponse.Artifacts[0].Base64.Length.ToString());
 					return serializedResponse.Artifacts[0].Base64;
 				}
 				catch (Exception e)
@@ -93,43 +98,6 @@ namespace SceneSculpt
 			{
 				RhinoApp.WriteLine(response.Content);
 				return null;
-			}
-		}
-
-		private class TextPrompt
-		{
-			[JsonPropertyName("text")]
-			public string Text { get; set; }
-
-			[JsonPropertyName("weight")]
-			public double Weight { get; set; } = promptWeight;
-
-			public TextPrompt(string text)
-			{
-				Text = text;
-			}
-		}
-
-		private class TextToImageRequest
-		{
-			[JsonPropertyName("height")]
-			public int Height { get; set; } = height;
-
-			[JsonPropertyName("width")]
-			public int Width { get; set; } = width;
-
-			[JsonPropertyName("cfg_scale")]
-			public int CfgScale { get; set; } = cfgScale;
-
-			[JsonPropertyName("text_prompts")]
-			public List<TextPrompt> TextPrompts { get; set; }
-
-			[JsonPropertyName("style_preset")]
-			public string StylePreset { get; set; } = stylePreset;
-
-			public TextToImageRequest(string text)
-			{
-				TextPrompts = new List<TextPrompt> { new TextPrompt(text) };
 			}
 		}
 
