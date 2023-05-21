@@ -57,15 +57,20 @@ namespace SceneSculpt
 
 		public static async Task<string> ImageToImage(string text, byte[] imageBytes)
 		{
-			var body = JsonSerializer.Serialize(new ImageToImageRequest(text));
 			var request = new RestRequest($"/generation/{engineId}/image-to-image", Method.Post);
-			// request.AddStringBody(body, DataFormat.Json);
+			request.AddFile("init_image", imageBytes, "image.png", "image/png");
 			request.AddParameter("text_prompts[0][text]", text);
 			request.AddParameter("text_prompts[0][weight]", promptWeight);
+			request.AddParameter("image_strength", 0.35);
+			request.AddParameter("init_image_mode", "IMAGE_STRENGTH");
+			request.AddParameter("cfg_scale", cfgScale);
+			request.AddParameter("clip_guidance_preset", "FAST_BLUE");
+			request.AddParameter("sampler", "K_DPM_2_ANCESTRAL");
+			request.AddParameter("samples", 1);
+			request.AddParameter("steps", 50);
 			request.AddHeader("Authorization", $"Bearer {apiKey}");
 			request.AddHeader("Content-Type", "multipart/form-data");
 			request.AddHeader("Accept", "application/json");
-			request.AddFile("init_image", imageBytes, "image.png", "image/png");
 			var response = await client.ExecuteAsync(request);
 
 			if (response.IsSuccessful)
@@ -88,41 +93,6 @@ namespace SceneSculpt
 			{
 				RhinoApp.WriteLine(response.Content);
 				return null;
-			}
-		}
-
-		private class ImageToImageRequest
-		{
-			[JsonPropertyName("image_strength")]
-			public double ImageStrength { get; set; } = 0.35;
-
-			[JsonPropertyName("init_image_mode")]
-			public string InitImageMode { get; set; } = "IMAGE_STRENGTH";
-
-			[JsonPropertyName("text_prompts[0][text]")]
-			public string TextPrompt { get; set; }
-
-			[JsonPropertyName("text_prompts[0][weight]")]
-			public double TextPromptWeight { get; set; } = promptWeight;
-
-			[JsonPropertyName("cfg_scale")]
-			public int CfgScale { get; set; } = cfgScale;
-
-			[JsonPropertyName("clip_guidance_preset")]
-			public string ClipGuidancePreset { get; set; } = "FAST_BLUE";
-
-			[JsonPropertyName("sampler")]
-			public string Sampler { get; set; } = "K_DPM_2_ANCESTRAL";
-
-			[JsonPropertyName("samples")]
-			public int Samples { get; set; } = 1;
-
-			[JsonPropertyName("steps")]
-			public int Steps { get; set; } = 20;
-
-			public ImageToImageRequest(string text)
-			{
-				TextPrompt = text;
 			}
 		}
 
