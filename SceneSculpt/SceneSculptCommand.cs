@@ -20,8 +20,7 @@ namespace SceneSculpt
 
 		protected override Result RunCommand(RhinoDoc doc, RunMode mode)
 		{
-			var form = new SceneSculptForm();
-			form.Show();
+			new SceneSculptForm().Show();
 			return Result.Success;
 		}
 	}
