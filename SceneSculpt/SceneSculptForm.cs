@@ -13,7 +13,7 @@ namespace SceneSculpt
     {
         private const int imageViewHeight = 512;
         private const int imageViewWidth = 512;
-        private TextBox promptBox = new TextBox();
+        private TextArea promptBox = new TextArea { Wrap = true };
         private Button goButton = new Button { Text = "Go" };
         private Button applyAsBackgroundButton = new Button { Text = "Apply as Background" };
         private Button captureFromViewportButton = new Button { Text = "Capture from Viewport" };
@@ -55,7 +55,7 @@ namespace SceneSculpt
             Title = "SceneSculpt";
             Size = new Size(-1, -1);
             AutoSize = true;
-						Resizable = false;
+            Resizable = false;
 
             goButton.Click += OnGoClicked;
             applyAsBackgroundButton.Click += OnApplyAsBackgroundClicked;
@@ -103,7 +103,7 @@ namespace SceneSculpt
             {
                 MinValue = (int)StableDiffusionParams.MIN_PROMPT_WEIGHT * 100,
                 MaxValue = (int)StableDiffusionParams.MAX_PROMPT_WEIGHT * 100,
-                Value = 35,
+                Value = 100,
                 Orientation = Orientation.Horizontal,
                 SnapToTick = true
             };
@@ -118,7 +118,7 @@ namespace SceneSculpt
             {
                 MinValue = (int)StableDiffusionParams.MIN_IMAGE_STRENGTH * 100,
                 MaxValue = (int)StableDiffusionParams.MAX_IMAGE_STRENGTH * 100,
-                Value = 35,
+                Value = 88,
                 Orientation = Orientation.Horizontal,
                 SnapToTick = true
             };
@@ -296,11 +296,10 @@ namespace SceneSculpt
             if (selectedView == null)
                 return;
 
-            using (var bitmap = selectedView.CaptureToBitmap())
-            using (var cropped = bitmap.ResizeAndCrop(new System.Drawing.Rectangle(0, 0, 512, 512)))
+            using (var bitmap = selectedView.CaptureToBitmap(new System.Drawing.Size(512, 512)))
             using (var stream = new MemoryStream())
             {
-                cropped.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
                 stream.Position = 0;
                 SetCurrentImage(new Bitmap(stream));
             }
@@ -313,7 +312,10 @@ namespace SceneSculpt
                 return;
 
             // TODO: Save in project path?
-            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "background.png");
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                "background.png"
+            );
             currentImage.Save(path, ImageFormat.Png);
             selectedView.MainViewport.SetWallpaper(path, false);
         }

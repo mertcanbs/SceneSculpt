@@ -10,8 +10,8 @@ namespace SceneSculpt
         public const int MAX_CFG_SCALE = 35;
         public const double MIN_PROMPT_WEIGHT = 0;
         public const double MAX_PROMPT_WEIGHT = 1;
-				public const double MIN_IMAGE_STRENGTH = 0;
-				public const double MAX_IMAGE_STRENGTH = 1;
+        public const double MIN_IMAGE_STRENGTH = 0;
+        public const double MAX_IMAGE_STRENGTH = 1;
 
         public static readonly List<string> CLIP_GUIDANCE_PRESETS = new List<string>
         {
@@ -66,7 +66,7 @@ namespace SceneSculpt
         public int Width { get; set; } = 512;
         public int CfgScale { get; set; } = 7;
         public double PromptWeight { get; set; } = 1;
-        public double ImageStrength { get; set; } = 0.35;
+        public double ImageStrength { get; set; } = 0.88;
         public string ClipGuidancePreset { get; set; } = "NONE";
         public string Sampler { get; set; } = "";
         public string StylePreset { get; set; } = "photographic";
