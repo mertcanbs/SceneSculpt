@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -18,7 +18,7 @@ namespace SceneSculpt
 		// Config
 		private static int height = 512;
 		private static int width = 512;
-		private static int cfgScale = 20;
+		private static int cfgScale = 7;
 		private static double promptWeight = 1;
 		private static string stylePreset = "photographic";
 
