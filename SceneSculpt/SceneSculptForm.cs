@@ -5,17 +5,21 @@ using System.IO;
 using Eto.Drawing;
 using Eto.Forms;
 using Rhino;
+using Rhino.Display;
 
 namespace SceneSculpt
 {
     internal sealed class SceneSculptForm : Form
     {
-        private const int imageViewHeight = 500;
-        private const int imageViewWidth = 500;
+        private const int imageViewHeight = 512;
+        private const int imageViewWidth = 512;
         private TextBox promptBox = new TextBox();
         private Button goButton = new Button { Text = "Go" };
         private Button applyAsBackgroundButton = new Button { Text = "Apply as Background" };
+        private Button captureFromViewportButton = new Button { Text = "Capture from Viewport" };
         private Button importImageButton = new Button { Text = "Import Image" };
+        private Button exportImageButton = new Button { Text = "Export Image" };
+        private Button toggleConfigButton = new Button { Text = "Config..." };
         private Spinner spinner = new Spinner();
         private Panel spinnerPanel;
         private Bitmap currentImage;
@@ -25,21 +29,39 @@ namespace SceneSculpt
             SelectedIndex = 0
         };
 
-        private ImageView imageView = new ImageView()
+        private ImageView imageView = new ImageView
         {
             Size = new Size(imageViewWidth, imageViewHeight),
         };
 
+        private TableCell configCell;
+        private Slider stepsSlider;
+        private Label stepsSliderLabel;
+        private Slider cfgScaleSlider;
+        private Label cfgScaleSliderLabel;
+        private Slider promptWeightSlider;
+        private Label promptWeightSliderLabel;
+        private Slider imageStrengthSlider;
+        private Label imageStrengthSliderLabel;
+        private DropDown clipGuidancePresetDropDown;
+        private DropDown samplerDropDown;
+        private DropDown stylePresetDropDown;
+
         private bool isGenerating = false;
 
+        // TODO: Definitely split this up into functional bits
         public SceneSculptForm()
         {
             Title = "SceneSculpt";
-            MinimumSize = new Size(500, 500);
+            Size = new Size(-1, -1);
+            MinimumSize = new Size(800, 512);
 
             goButton.Click += OnGoClicked;
             applyAsBackgroundButton.Click += OnApplyAsBackgroundClicked;
+            captureFromViewportButton.Click += OnCaptureFromViewportClicked;
             importImageButton.Click += OnImportImageClicked;
+            exportImageButton.Click += OnExportImageClicked;
+            toggleConfigButton.Click += OnToggleConfigClicked;
 
             spinnerPanel = new Panel
             {
@@ -52,47 +74,176 @@ namespace SceneSculpt
                 },
             };
 
+            stepsSlider = new Slider
+            {
+                MinValue = StableDiffusionParams.MIN_STEPS,
+                MaxValue = StableDiffusionParams.MAX_STEPS,
+                Value = 50,
+                Orientation = Orientation.Horizontal,
+                SnapToTick = true,
+            };
+
+            stepsSlider.ValueChanged += OnStepsSliderValueChanged;
+            stepsSliderLabel = new Label { Text = $"Steps: {stepsSlider.Value}" };
+
+            cfgScaleSlider = new Slider
+            {
+                MinValue = StableDiffusionParams.MIN_CFG_SCALE,
+                MaxValue = StableDiffusionParams.MAX_CFG_SCALE,
+                Value = 7,
+                Orientation = Orientation.Horizontal,
+                SnapToTick = true
+            };
+
+            cfgScaleSlider.ValueChanged += OnCfgScaleSliderValueChanged;
+            cfgScaleSliderLabel = new Label { Text = $"Cfg Scale: {cfgScaleSlider.Value}" };
+
+            promptWeightSlider = new Slider
+            {
+                MinValue = (int)StableDiffusionParams.MIN_PROMPT_WEIGHT * 100,
+                MaxValue = (int)StableDiffusionParams.MAX_PROMPT_WEIGHT * 100,
+                Value = 35,
+                Orientation = Orientation.Horizontal,
+                SnapToTick = true
+            };
+
+            promptWeightSlider.ValueChanged += OnPromptWeightSliderValueChanged;
+            promptWeightSliderLabel = new Label
+            {
+                Text = $"Prompt Weight: {(double)promptWeightSlider.Value / 100}"
+            };
+
+            imageStrengthSlider = new Slider
+            {
+                MinValue = (int)StableDiffusionParams.MIN_IMAGE_STRENGTH * 100,
+                MaxValue = (int)StableDiffusionParams.MAX_IMAGE_STRENGTH * 100,
+                Value = 35,
+                Orientation = Orientation.Horizontal,
+                SnapToTick = true
+            };
+
+            imageStrengthSlider.ValueChanged += OnImageStrengthSliderValueChanged;
+            imageStrengthSliderLabel = new Label
+            {
+                Text = $"Image Strength: {(double)imageStrengthSlider.Value / 100}"
+            };
+
+            clipGuidancePresetDropDown = new DropDown
+            {
+                DataStore = StableDiffusionParams.CLIP_GUIDANCE_PRESETS,
+                SelectedValue = "NONE",
+            };
+
+            samplerDropDown = new DropDown
+            {
+                DataStore = StableDiffusionParams.SAMPLERS,
+                SelectedValue = "",
+            };
+
+            stylePresetDropDown = new DropDown
+            {
+                DataStore = StableDiffusionParams.STYLE_PRESETS,
+                SelectedValue = "photographic",
+            };
+
+            configCell = new TableCell
+            {
+                ScaleWidth = false,
+                Control = new StackLayout
+                {
+                    Padding = 20,
+                    Spacing = 10,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                    Items =
+                    {
+                        stepsSliderLabel,
+                        stepsSlider,
+                        cfgScaleSliderLabel,
+                        cfgScaleSlider,
+                        new Label { Text = "Clip Guidance" },
+                        clipGuidancePresetDropDown,
+                        new Label { Text = "Sampler" },
+                        samplerDropDown,
+                        new Label { Text = "Style" },
+                        stylePresetDropDown,
+                        imageStrengthSliderLabel,
+                        imageStrengthSlider,
+                        promptWeightSliderLabel,
+                        promptWeightSlider,
+                    }
+                }
+            };
+
             imageView.Visible = false;
-            spinnerPanel.Visible = false;
+            spinnerPanel.Visible = true;
+            spinner.Visible = false;
             applyAsBackgroundButton.Visible = false;
 
-            Content = new StackLayout
+            Content = new TableLayout
             {
+                Size = new Size(-1, -1),
                 Padding = 20,
-                Items =
+                Rows =
                 {
-                    spinnerPanel,
-                    imageView,
-                    promptBox,
-                    modeDropDown,
-                    goButton,
-                    applyAsBackgroundButton,
-                    importImageButton
+                    new TableRow
+                    {
+                        Cells =
+                        {
+                            new TableCell
+                            {
+                                ScaleWidth = false,
+                                Control = new StackLayout { Items = { spinnerPanel, imageView } }
+                            },
+                            new TableCell
+                            {
+                                ScaleWidth = false,
+                                Control = new StackLayout
+                                {
+                                    Padding = 20,
+                                    Spacing = 10,
+                                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                                    Items =
+                                    {
+                                        promptBox,
+                                        modeDropDown,
+                                        goButton,
+                                        applyAsBackgroundButton,
+                                        importImageButton,
+                                        exportImageButton,
+                                        captureFromViewportButton,
+                                        toggleConfigButton
+                                    }
+                                }
+                            },
+                            configCell
+                        }
+                    }
                 }
             };
         }
 
-        private void OnApplyAsBackgroundClicked(object sender, EventArgs e)
+        private void OnExportImageClicked(object sender, EventArgs e)
         {
-            var views = RhinoDoc.ActiveDoc.Views.GetViewList(true, true);
-            var viewNames = views.Select(v => v.MainViewport.Name).ToList();
-            var selectedViewName = (string)
-                Rhino.UI.Dialogs.ShowListBox("Views", "Select a view", viewNames);
-            if (selectedViewName == null)
+            var fileDialog = new SaveFileDialog();
+            fileDialog.Filters.Add(new FileFilter("PNG", ".png"));
+            var result = fileDialog.ShowDialog(this);
+            if (result != DialogResult.Ok)
                 return;
 
-            // TODO: Save in a temp path or the project path
-            var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                "background.png"
-            );
+            var path = fileDialog.FileName;
             currentImage.Save(path, ImageFormat.Png);
+        }
 
-            var selectedView = views.FirstOrDefault(v => v.MainViewport.Name == selectedViewName);
-            if (selectedView == null)
-                return;
+        private void OnImageStrengthSliderValueChanged(object sender, EventArgs e)
+        {
+            imageStrengthSliderLabel.Text =
+                $"Image Strength: {(double)imageStrengthSlider.Value / 100}";
+        }
 
-            selectedView.MainViewport.SetWallpaper(path, false);
+        private void OnPromptWeightSliderValueChanged(object sender, EventArgs e)
+        {
+            promptWeightSliderLabel.Text =
+                $"Prompt Weight: {(double)promptWeightSlider.Value / 100}";
         }
 
         ~SceneSculptForm()
@@ -100,6 +251,82 @@ namespace SceneSculpt
             goButton.Click -= OnGoClicked;
             applyAsBackgroundButton.Click -= OnApplyAsBackgroundClicked;
             importImageButton.Click -= OnImportImageClicked;
+            exportImageButton.Click -= OnExportImageClicked;
+            captureFromViewportButton.Click -= OnCaptureFromViewportClicked;
+            toggleConfigButton.Click -= OnToggleConfigClicked;
+            stepsSlider.ValueChanged -= OnStepsSliderValueChanged;
+            cfgScaleSlider.ValueChanged -= OnCfgScaleSliderValueChanged;
+            promptWeightSlider.ValueChanged -= OnPromptWeightSliderValueChanged;
+            imageStrengthSlider.ValueChanged -= OnImageStrengthSliderValueChanged;
+            currentImage?.Dispose();
+        }
+
+        private void OnStepsSliderValueChanged(object sender, EventArgs e)
+        {
+            stepsSliderLabel.Text = $"Steps: {stepsSlider.Value}";
+        }
+
+        private void OnCfgScaleSliderValueChanged(object sender, EventArgs e)
+        {
+            cfgScaleSliderLabel.Text = $"Cfg Scale: {cfgScaleSlider.Value}";
+        }
+
+        private void OnToggleConfigClicked(object sender, EventArgs e)
+        {
+            configCell.Control.Visible = !configCell.Control.Visible;
+        }
+
+        private void SetCurrentImage(Bitmap bitmap)
+        {
+            currentImage?.Dispose();
+            currentImage = bitmap;
+            imageView.Image = currentImage;
+            imageView.Visible = true;
+            spinnerPanel.Visible = false;
+            applyAsBackgroundButton.Visible = true;
+        }
+
+        private void OnCaptureFromViewportClicked(object sender, EventArgs e)
+        {
+            var selectedView = GetViewSelection();
+            if (selectedView == null)
+                return;
+
+            using (var bitmap = selectedView.CaptureToBitmap())
+            using (var cropped = bitmap.ResizeAndCrop(new System.Drawing.Rectangle(0, 0, 512, 512)))
+            using (var stream = new MemoryStream())
+            {
+                cropped.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                stream.Position = 0;
+                SetCurrentImage(new Bitmap(stream));
+            }
+        }
+
+        private void OnApplyAsBackgroundClicked(object sender, EventArgs e)
+        {
+            var selectedView = GetViewSelection();
+            if (selectedView == null)
+                return;
+
+            // TODO: Save in project path?
+            var path = Path.Combine(Path.GetTempPath(), "background.png");
+
+            currentImage.Save(path, ImageFormat.Png);
+            selectedView.MainViewport.SetWallpaper(path, false);
+        }
+
+        private RhinoView GetViewSelection()
+        {
+            var views = RhinoDoc.ActiveDoc.Views.GetViewList(true, false);
+            if (views.Length == 1)
+                return views[0];
+            var viewNames = views.Select(v => v.MainViewport.Name).ToList();
+            var selectedViewName = (string)
+                Rhino.UI.Dialogs.ShowListBox("Views", "Select a view", viewNames);
+            if (selectedViewName == null)
+                return null;
+
+            return views.FirstOrDefault(v => v.MainViewport.Name == selectedViewName);
         }
 
         private async void OnGoClicked(object sender, EventArgs e)
@@ -111,6 +338,7 @@ namespace SceneSculpt
 
             isGenerating = true;
             spinnerPanel.Visible = true;
+            spinner.Visible = true;
             spinner.Enabled = true;
             imageView.Visible = false;
             applyAsBackgroundButton.Visible = false;
@@ -118,14 +346,26 @@ namespace SceneSculpt
             try
             {
                 string base64 = "";
+                var parameters = new StableDiffusionParams
+                {
+                    Prompt = promptBox.Text,
+                    CfgScale = cfgScaleSlider.Value,
+                    Steps = stepsSlider.Value,
+                    PromptWeight = (double)promptWeightSlider.Value / 100,
+                    ImageStrength = (double)imageStrengthSlider.Value / 100,
+                    ClipGuidancePreset = (string)clipGuidancePresetDropDown.SelectedValue,
+                    StylePreset = (string)stylePresetDropDown.SelectedValue,
+                    Sampler = (string)samplerDropDown.SelectedValue,
+                };
+                // TODO: This is gross, make it type safe with a proper enum
                 if (modeDropDown.SelectedIndex == 0)
                 {
-                    base64 = await StableDiffusionAPIClient.TextToImage(promptBox.Text);
+                    base64 = await StableDiffusionAPIClient.TextToImage(parameters);
                 }
                 else
                 {
                     base64 = await StableDiffusionAPIClient.ImageToImage(
-                        promptBox.Text,
+                        parameters,
                         currentImage.ToByteArray(ImageFormat.Png)
                     );
                 }
@@ -134,10 +374,7 @@ namespace SceneSculpt
                 {
                     var image = Convert.FromBase64String(base64);
                     var bitmap = new Bitmap(image);
-                    imageView.Image = bitmap;
-                    currentImage = bitmap;
-                    imageView.Visible = true;
-                    applyAsBackgroundButton.Visible = true;
+                    SetCurrentImage(bitmap);
                 }
                 else
                 {
@@ -172,16 +409,16 @@ namespace SceneSculpt
 
             try
             {
-                var bitmap = new System.Drawing.Bitmap(fileDialog.FileName);
-                var cropped = bitmap.ResizeAndCrop(new System.Drawing.Rectangle(0, 0, 512, 512));
-								using (Stream stream = new MemoryStream()) {
-									cropped.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
-									stream.Position = 0;
-									currentImage = new Bitmap(stream);
-									imageView.Image = currentImage;
-									imageView.Visible = true;
-									applyAsBackgroundButton.Visible = true;
-								}
+                using (var bitmap = new System.Drawing.Bitmap(fileDialog.FileName))
+                using (
+                    var cropped = bitmap.ResizeAndCrop(new System.Drawing.Rectangle(0, 0, 512, 512))
+                )
+                using (Stream stream = new MemoryStream())
+                {
+                    cropped.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    stream.Position = 0;
+                    SetCurrentImage(new Bitmap(stream));
+                }
             }
             catch (Exception ex)
             {

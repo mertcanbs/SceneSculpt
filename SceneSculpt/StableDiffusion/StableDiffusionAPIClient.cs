@@ -15,33 +15,34 @@ namespace SceneSculpt
         private static readonly string apiKey =
             "sk-0F4jX4w6EdApKD4JrB6nXxT2cQlpU07GCgZlzOFG2iUVQQm9";
 
-        // Config
-        private static int height = 512;
-        private static int width = 512;
-        private static int cfgScale = 7;
-        private static double promptWeight = 1;
-        private static string stylePreset = "photographic";
-
-        public static async Task<string> TextToImage(string text)
+        public static async Task<string> TextToImage(StableDiffusionParams parameters)
         {
             var body = new Dictionary<string, object>
             {
-                { "height", height },
-                { "width", width },
-                { "cfg_scale", cfgScale },
-                { "style_preset", stylePreset },
+                { "height", parameters.Height },
+                { "width", parameters.Width },
+                { "cfg_scale", parameters.CfgScale },
+                { "steps", parameters.Steps },
+                { "clip_guidance_preset", parameters.ClipGuidancePreset },
+                { "style_preset", parameters.StylePreset },
                 {
                     "text_prompts",
                     new List<object>
                     {
                         new Dictionary<string, object>
                         {
-                            { "text", text },
-                            { "weight", promptWeight },
+                            { "text", parameters.Prompt },
+                            { "weight", parameters.PromptWeight },
                         },
                     }
                 },
             };
+
+            if (!string.IsNullOrEmpty(parameters.Sampler))
+            {
+                body.Add("sampler", parameters.Sampler);
+            }
+
             var request = new RestRequest($"/generation/{engineId}/text-to-image", Method.Post);
             request.AddBody(body, ContentType.Json);
             request.AddHeader("Authorization", $"Bearer {apiKey}");
@@ -71,19 +72,22 @@ namespace SceneSculpt
             }
         }
 
-        public static async Task<string> ImageToImage(string text, byte[] imageBytes)
+        public static async Task<string> ImageToImage(StableDiffusionParams parameters, byte[] imageBytes)
         {
             var request = new RestRequest($"/generation/{engineId}/image-to-image", Method.Post);
             request.AddFile("init_image", imageBytes, "image.png", "image/png");
-            request.AddParameter("text_prompts[0][text]", text);
-            request.AddParameter("text_prompts[0][weight]", promptWeight);
-            request.AddParameter("image_strength", 0.35);
+            request.AddParameter("text_prompts[0][text]", parameters.Prompt);
+            request.AddParameter("text_prompts[0][weight]", parameters.PromptWeight);
+            request.AddParameter("image_strength", parameters.ImageStrength);
             request.AddParameter("init_image_mode", "IMAGE_STRENGTH");
-            request.AddParameter("cfg_scale", cfgScale);
-            request.AddParameter("clip_guidance_preset", "FAST_BLUE");
-            request.AddParameter("sampler", "K_DPM_2_ANCESTRAL");
+            request.AddParameter("cfg_scale", parameters.CfgScale);
+            request.AddParameter("clip_guidance_preset", parameters.ClipGuidancePreset);
+            request.AddParameter("steps", parameters.Steps);
             request.AddParameter("samples", 1);
-            request.AddParameter("steps", 50);
+            if (!string.IsNullOrEmpty(parameters.Sampler))
+            {
+                request.AddParameter("sampler", parameters.Sampler);
+            }
             request.AddHeader("Authorization", $"Bearer {apiKey}");
             request.AddHeader("Content-Type", "multipart/form-data");
             request.AddHeader("Accept", "application/json");
